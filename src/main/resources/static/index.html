@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SecureAuth — JWT Authentication System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    /* ════════════════════════════════════════
+       DESIGN TOKENS
+    ════════════════════════════════════════ */
+    :root {
+      --bg0:        #05080d;
+      --bg1:        #090e16;
+      --bg2:        #0f1520;
+      --bg3:        #141c2a;
+      --bg4:        #1a2435;
+      --border:     rgba(99,179,255,0.08);
+      --border-hi:  rgba(99,179,255,0.2);
+      --accent:     #63b3ff;
+      --accent2:    #38d9a9;
+      --accent3:    #ffd166;
+      --danger:     #ff6b6b;
+      --danger-bg:  rgba(255,107,107,0.08);
+      --success:    #38d9a9;
+      --success-bg: rgba(56,217,169,0.08);
+      --text:       #e2eaf5;
+      --text2:      #8fa3bf;
+      --text3:      #4a6080;
+      --mono:       'JetBrains Mono', monospace;
+      --head:       'Syne', sans-serif;
+      --body:       'Instrument Sans', sans-serif;
+      --r:          8px;
+      --r-lg:       14px;
+      --r-xl:       20px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg0);
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 14px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ════════════════════════════════════════
+       GRID BACKGROUND
+    ════════════════════════════════════════ */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,179,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,179,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ════════════════════════════════════════
+       AUTH SCREEN
+    ════════════════════════════════════════ */
+    #auth-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .auth-glow {
+      position: fixed;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(99,179,255,0.06) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .auth-container { width: 100%; max-width: 440px; position: relative; }
+
+    .auth-brand {
+      text-align: center;
+      margin-bottom: 36px;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .brand-icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, rgba(99,179,255,0.2), rgba(56,217,169,0.1));
+      border: 1px solid var(--border-hi);
+      border-radius: var(--r-lg);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      font-size: 22px;
+    }
+
+    .brand-name {
+      font-family: var(--head);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      display: block;
+    }
+
+    .brand-tagline {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+      letter-spacing: 0.12em;
+      margin-top: 4px;
+    }
+
+    .auth-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 32px;
+      animation: fadeUp 0.6s ease 0.1s both;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(99,179,255,0.3), transparent);
+    }
+
+    /* ── Tab switcher ── */
+    .tab-bar {
+      display: flex;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 3px;
+      margin-bottom: 28px;
+      gap: 2px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 9px 16px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      font-family: var(--body);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text3);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--bg3);
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+
+    /* ── Form elements ── */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { margin-bottom: 16px; }
+
+    .form-label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 11px 14px;
+      font-family: var(--body);
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: rgba(99,179,255,0.4);
+      box-shadow: 0 0 0 3px rgba(99,179,255,0.06);
+    }
+
+    .form-input::placeholder { color: var(--text3); }
+
+    select.form-input { cursor: pointer; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border: 1px solid transparent;
+      border-radius: var(--r);
+      font-family: var(--body);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.18s;
+      position: relative;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--accent);
+      color: #05080d;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover { background: #7dc4ff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(99,179,255,0.25); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border-color: var(--border);
+    }
+
+    .btn-ghost:hover { border-color: var(--border-hi); color: var(--text); background: var(--bg3); }
+
+    .btn-danger {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-color: rgba(255,107,107,0.25);
+    }
+
+    .btn-danger:hover { background: rgba(255,107,107,0.15); }
+
+    .btn-sm { padding: 6px 14px; font-size: 12px; }
+
+    .btn-icon {
+      width: 32px; height: 32px;
+      padding: 0;
+      background: var(--bg3);
+      border-color: var(--border);
+      color: var(--text2);
+      border-radius: var(--r);
+    }
+
+    .btn-icon:hover { border-color: var(--border-hi); color: var(--text); }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 11px 14px;
+      border-radius: var(--r);
+      font-size: 13px;
+      font-family: var(--mono);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .alert-error { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(255,107,107,0.2); }
+    .alert-success { background: var(--success-bg); color: var(--success); border: 1px solid rgba(56,217,169,0.2); }
+
+    /* ── Demo hint ── */
+    .demo-hint {
+      margin-top: 20px;
+      padding: 14px;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+    }
+
+    .demo-hint-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .demo-cred {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .demo-cred:last-child { border-bottom: none; }
+
+    .demo-cred span { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+    .demo-cred em { font-family: var(--mono); font-size: 11px; color: var(--text3); font-style: normal; }
+
+    /* ════════════════════════════════════════
+       APP LAYOUT
+    ════════════════════════════════════════ */
+    #app-screen { display: none; min-height: 100vh; position: relative; z-index: 1; }
+    #app-screen.visible { display: flex; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px;
+      min-height: 100vh;
+      background: var(--bg1);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+
+    .sidebar-top {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-box {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, rgba(99,179,255,0.2), rgba(56,217,169,0.1));
+      border: 1px solid var(--border-hi);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .logo-text {
+      font-family: var(--head);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .logo-ver {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text3);
+      margin-top: 1px;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 10px 8px;
+      overflow-y: auto;
+    }
+
+    .nav-section-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text3);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 10px 10px 4px;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      padding: 9px 10px;
+      border: none;
+      border-radius: var(--r);
+      background: none;
+      color: var(--text3);
+      font-family: var(--body);
+      font-size: 13px;
+      font-weight: 400;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+      margin-bottom: 1px;
+    }
+
+    .nav-btn:hover { background: var(--bg3); color: var(--text2); }
+
+    .nav-btn.active {
+      background: rgba(99,179,255,0.08);
+      color: var(--accent);
+    }
+
+    .nav-btn .ni { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+
+    .nav-pill {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    .pill-green { background: rgba(56,217,169,0.12); color: var(--accent2); }
+    .pill-orange { background: rgba(255,209,102,0.12); color: var(--accent3); }
+    .pill-red { background: var(--danger-bg); color: var(--danger); }
+
+    .sidebar-footer {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .user-card {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 10px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+    }
+
+    .user-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(99,179,255,0.3), rgba(56,217,169,0.2));
+      border: 1px solid var(--border-hi);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .user-info { flex: 1; min-width: 0; }
+    .user-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-role-text { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+    .logout-icon-btn {
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 13px;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .logout-icon-btn:hover { color: var(--danger); }
+
+    /* ── Main content area ── */
+    .main-area {
+      flex: 1;
+      margin-left: 220px;
+      padding: 32px;
+      max-width: calc(100% - 220px);
+    }
+
+    /* ════════════════════════════════════════
+       PAGE HEADER
+    ════════════════════════════════════════ */
+    .page-head {
+      margin-bottom: 28px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .page-head h1 {
+      font-family: var(--head);
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+
+    .page-head p {
+      color: var(--text3);
+      font-size: 13px;
+      margin-top: 4px;
+      font-family: var(--mono);
+    }
+
+    /* ════════════════════════════════════════
+       STAT CARDS
+    ════════════════════════════════════════ */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+
+    .stat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .stat-card:hover { border-color: var(--border-hi); }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      opacity: 0.04;
+    }
+
+    .stat-card.c-blue::after { background: var(--accent); }
+    .stat-card.c-green::after { background: var(--accent2); }
+    .stat-card.c-yellow::after { background: var(--accent3); }
+    .stat-card.c-red::after { background: var(--danger); }
+
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-family: var(--head);
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      margin-top: 6px;
+    }
+
+    .stat-sub.up { color: var(--accent2); }
+    .stat-sub.neutral { color: var(--text3); }
+    .stat-sub.warn { color: var(--accent3); }
+
+    /* ════════════════════════════════════════
+       CARDS
+    ════════════════════════════════════════ */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .card-title {
+      font-family: var(--head);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .card-sub-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    /* ════════════════════════════════════════
+       TOKEN DISPLAY
+    ════════════════════════════════════════ */
+    .token-wrap {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      word-break: break-all;
+      line-height: 1.6;
+      position: relative;
+      margin-top: 8px;
+    }
+
+    .token-copy-btn {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text3);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 3px 9px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .token-copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .token-type-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+    }
+
+    .tag-access { background: rgba(99,179,255,0.1); color: var(--accent); border: 1px solid rgba(99,179,255,0.2); }
+    .tag-refresh { background: rgba(255,209,102,0.1); color: var(--accent3); border: 1px solid rgba(255,209,102,0.2); }
+
+    .decoded-box {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text2);
+      white-space: pre-wrap;
+      margin-top: 8px;
+      line-height: 1.7;
+    }
+
+    .decoded-key { color: var(--accent2); }
+    .decoded-val { color: var(--accent3); }
+    .decoded-str { color: var(--accent); }
+
+    /* ════════════════════════════════════════
+       TABLE
+    ════════════════════════════════════════ */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--r-lg);
+      border: 1px solid var(--border);
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead tr {
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 400;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 13px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: rgba(99,179,255,0.02); }
+
+    .td-mono { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+    /* ── Role chips ── */
+    .role-chip {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-right: 4px;
+    }
+
+    .chip-admin  { background: rgba(255,209,102,0.1); color: var(--accent3); border: 1px solid rgba(255,209,102,0.2); }
+    .chip-user   { background: rgba(99,179,255,0.1);  color: var(--accent);  border: 1px solid rgba(99,179,255,0.2); }
+    .chip-mod    { background: rgba(56,217,169,0.1);  color: var(--accent2); border: 1px solid rgba(56,217,169,0.2); }
+
+    /* ── Status dot ── */
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .dot-on { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); animation: pulse 2s ease-in-out infinite; }
+    .dot-off { background: var(--text3); }
+
+    /* ════════════════════════════════════════
+       ENDPOINT EXPLORER
+    ════════════════════════════════════════ */
+    .ep-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .ep-row:last-child { border-bottom: none; }
+    .ep-row:hover { background: rgba(99,179,255,0.02); }
+
+    .method-tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 5px;
+      min-width: 46px;
+      text-align: center;
+    }
+
+    .m-get    { background: rgba(56,217,169,0.1); color: var(--accent2); border: 1px solid rgba(56,217,169,0.2); }
+    .m-post   { background: rgba(99,179,255,0.1); color: var(--accent);  border: 1px solid rgba(99,179,255,0.2); }
+    .m-delete { background: var(--danger-bg);     color: var(--danger);  border: 1px solid rgba(255,107,107,0.2); }
+
+    .ep-path { font-family: var(--mono); font-size: 12px; color: var(--accent); flex: 1; }
+    .ep-desc { font-size: 12px; color: var(--text3); }
+    .ep-lock { font-size: 12px; }
+
+    /* ════════════════════════════════════════
+       API TESTER
+    ════════════════════════════════════════ */
+    .tester-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    .res-viewer {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent2);
+      min-height: 280px;
+      max-height: 380px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.7;
+    }
+
+    /* ════════════════════════════════════════
+       SPINNER
+    ════════════════════════════════════════ */
+    .spin {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(99,179,255,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    /* ════════════════════════════════════════
+       FLOW STEPS
+    ════════════════════════════════════════ */
+    .flow-step {
+      display: flex;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+
+    .flow-step:last-child { border-bottom: none; }
+
+    .step-num {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent);
+      background: rgba(99,179,255,0.1);
+      border: 1px solid rgba(99,179,255,0.2);
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
+    .step-code { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+
+    /* ════════════════════════════════════════
+       DIVIDER
+    ════════════════════════════════════════ */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+    /* ════════════════════════════════════════
+       ANIMATIONS
+    ════════════════════════════════════════ */
+    @keyframes fadeDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+    @keyframes fadeUp   { from { opacity: 0; transform: translateY(12px);  } to { opacity: 1; transform: none; } }
+    @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes spin     { to { transform: rotate(360deg); } }
+    @keyframes pulse    { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* ════════════════════════════════════════
+       UTILITIES
+    ════════════════════════════════════════ */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .gap-8  { gap: 8px; }
+    .gap-10 { gap: 10px; }
+    .gap-12 { gap: 12px; }
+    .mb-12  { margin-bottom: 12px; }
+    .mb-16  { margin-bottom: 16px; }
+    .mb-20  { margin-bottom: 20px; }
+    .text-muted { color: var(--text3); font-size: 12px; font-family: var(--mono); }
+    .text-accent { color: var(--accent); }
+    .w-full { width: 100%; }
+    .page { display: none; animation: fadeIn 0.25s ease; }
+    .page.active { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     AUTH SCREEN
+══════════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-glow"></div>
+  <div class="auth-container">
+
+    <div class="auth-brand">
+      <div class="brand-icon">🔐</div>
+      <span class="brand-name">SecureAuth</span>
+      <p class="brand-tagline">// JWT AUTHENTICATION SYSTEM</p>
+    </div>
+
+    <div class="auth-card">
+      <div id="auth-alert" class="alert hidden"></div>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <!-- Login Form -->
+      <div id="login-form">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" id="l-username" class="form-input" placeholder="john_doe"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="l-password" class="form-input" placeholder="••••••••"
+                 onkeydown="if(event.key==='Enter') doLogin()"/>
+        </div>
+        <button class="btn btn-primary" onclick="doLogin()">
+          <span id="login-spin" class="spin"></span>
+          Sign In
+        </button>
+
+        <div class="demo-hint" style="margin-top:18px">
+          <div class="demo-hint-title">// DEMO CREDENTIALS</div>
+          <div class="demo-cred">
+            <span>admin / admin123</span>
+            <em>ROLE_ADMIN</em>
+          </div>
+          <div class="demo-cred">
+            <span>user / user123</span>
+            <em>ROLE_USER</em>
+          </div>
+        </div>
+      </div>
+
+      <!-- Register Form -->
+      <div id="register-form" class="hidden">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" id="r-username" class="form-input" placeholder="john_doe"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="r-email" class="form-input" placeholder="john@mail.com"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="r-password" class="form-input" placeholder="min 6 characters"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select id="r-role" class="form-input">
+            <option value="user">User</option>
+            <option value="mod">Moderator</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="doRegister()">
+          <span id="reg-spin" class="spin"></span>
+          Create Account
+        </button>
+      </div>
+    </div>
+
+    <p style="text-align:center;margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--text3)">
+      API → <span style="color:var(--accent)" id="api-url-show">http://localhost:8080</span>
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     APP SCREEN
+══════════════════════════════════════════════ -->
+<div id="app-screen">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-logo">
+        <div class="logo-box">🔐</div>
+        <div>
+          <div class="logo-text">SecureAuth</div>
+          <div class="logo-ver">v1.0 · JWT Service</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <button class="nav-btn active" onclick="goPage('dashboard')">
+        <span class="ni">◈</span> Dashboard
+      </button>
+      <button class="nav-btn" onclick="goPage('tokens')">
+        <span class="ni">⟐</span> Tokens
+        <span class="nav-pill pill-green">Live</span>
+      </button>
+
+      <div class="nav-section-label">API</div>
+      <button class="nav-btn" onclick="goPage('tester')">
+        <span class="ni">⌁</span> API Tester
+      </button>
+      <button class="nav-btn" onclick="goPage('endpoints')">
+        <span class="ni">⊞</span> Endpoints
+      </button>
+
+      <div class="nav-section-label" id="admin-label">Admin</div>
+      <button class="nav-btn" id="nav-users" onclick="goPage('users')">
+        <span class="ni">◎</span> Users
+      </button>
+      <button class="nav-btn" id="nav-roles" onclick="goPage('roles')">
+        <span class="ni">◉</span> Roles
+        <span class="nav-pill pill-red">Admin</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar" id="s-avatar">??</div>
+        <div class="user-info">
+          <div class="user-name" id="s-name">—</div>
+          <div class="user-role-text" id="s-role">—</div>
+        </div>
+        <button class="logout-icon-btn" onclick="doLogout()" title="Logout">✕</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-area">
+
+    <!-- ── DASHBOARD ── -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-head">
+        <div>
+          <h1>Dashboard</h1>
+          <p>// system overview · jwt auth service</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="doRefresh()">↻ Refresh Token</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card c-green">
+          <div class="stat-label">API Status</div>
+          <div class="stat-value" style="font-size:18px;display:flex;align-items:center;gap:8px;margin-top:6px">
+            <span class="status-dot dot-on"></span> Online
+          </div>
+          <div class="stat-sub up">Backend reachable</div>
+        </div>
+        <div class="stat-card c-blue">
+          <div class="stat-label">Access Token TTL</div>
+          <div class="stat-value">15m</div>
+          <div class="stat-sub neutral">JWT expiry window</div>
+        </div>
+        <div class="stat-card c-yellow">
+          <div class="stat-label">Refresh Token TTL</div>
+          <div class="stat-value">7d</div>
+          <div class="stat-sub neutral">DB-backed token</div>
+        </div>
+        <div class="stat-card c-blue">
+          <div class="stat-label">Your Roles</div>
+          <div class="stat-value" id="d-role-count">—</div>
+          <div class="stat-sub neutral" id="d-role-names">—</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Session Info</div>
+            <span class="card-sub-label">current user</span>
+          </div>
+          <table style="width:100%">
+            <tr>
+              <td style="padding:7px 0;color:var(--text3);font-family:var(--mono);font-size:11px">User ID</td>
+              <td style="padding:7px 0;text-align:right;font-family:var(--mono);font-size:12px" id="d-id">—</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--text3);font-family:var(--mono);font-size:11px;border-top:1px solid var(--border)">Username</td>
+              <td style="padding:7px 0;text-align:right;font-family:var(--mono);font-size:12px;border-top:1px solid var(--border)" id="d-username">—</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--text3);font-family:var(--mono);font-size:11px;border-top:1px solid var(--border)">Email</td>
+              <td style="padding:7px 0;text-align:right;font-family:var(--mono);font-size:12px;border-top:1px solid var(--border)" id="d-email">—</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--text3);font-family:var(--mono);font-size:11px;border-top:1px solid var(--border)">Token Type</td>
+              <td style="padding:7px 0;text-align:right;font-family:var(--mono);font-size:12px;color:var(--accent);border-top:1px solid var(--border)">Bearer JWT</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">JWT Flow</div>
+            <span class="card-sub-label">how it works</span>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">1</div>
+            <div class="step-text">Client sends credentials to <span class="step-code">/api/auth/login</span></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">2</div>
+            <div class="step-text">Server returns <span class="step-code">accessToken</span> (15m) + <span class="step-code">refreshToken</span> (7d)</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">3</div>
+            <div class="step-text">Client sends <span class="step-code">Authorization: Bearer &lt;token&gt;</span> on every request</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">4</div>
+            <div class="step-text">On 401 → call <span class="step-code">/api/auth/refresh</span> for new token</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">5</div>
+            <div class="step-text">On logout → refresh token deleted from DB</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">Quick Actions</div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="doRefresh()">↻ Refresh Access Token</button>
+          <button class="btn btn-ghost btn-sm" onclick="goPage('tester')">⌁ Open API Tester</button>
+          <button class="btn btn-ghost btn-sm" onclick="goPage('tokens')">⟐ Inspect Tokens</button>
+          <button class="btn btn-ghost btn-sm" onclick="goPage('endpoints')">⊞ View All Endpoints</button>
+          <button class="btn btn-danger btn-sm" onclick="doLogout()">✕ Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TOKENS PAGE ── -->
+    <div id="page-tokens" class="page">
+      <div class="page-head">
+        <div>
+          <h1>Token Inspector</h1>
+          <p>// view · decode · manage your jwt tokens</p>
+        </div>
+      </div>
+
+      <div class="card mb-20">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Access Token</div>
+            <div class="card-sub-label">stateless JWT · expires in 15 min</div>
+          </div>
+          <span class="token-type-tag tag-access">● Access</span>
+        </div>
+
+        <div class="text-muted mb-12">Raw JWT String</div>
+        <div class="token-wrap" id="t-access">
+          <button class="token-copy-btn" onclick="copyTok('access')">Copy</button>
+          —
+        </div>
+
+        <div class="text-muted mb-12" style="margin-top:16px">Decoded Payload</div>
+        <div class="decoded-box" id="t-decoded">—</div>
+      </div>
+
+      <div class="card mb-20">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Refresh Token</div>
+            <div class="card-sub-label">stored in database · expires in 7 days · can be revoked</div>
+          </div>
+          <span class="token-type-tag tag-refresh">● Refresh</span>
+        </div>
+
+        <div class="text-muted mb-12">UUID Token String</div>
+        <div class="token-wrap" id="t-refresh" style="color:var(--accent3)">
+          <button class="token-copy-btn" onclick="copyTok('refresh')">Copy</button>
+          —
+        </div>
+        <p style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--text3)">
+          // This token is persisted in refresh_tokens table and can be revoked via /logout
+        </p>
+      </div>
+
+      <div style="display:flex;gap:12px">
+        <button class="btn btn-ghost w-full" onclick="doRefresh()">↻ Refresh Access Token</button>
+        <button class="btn btn-danger w-full" onclick="doLogout()">✕ Revoke &amp; Logout</button>
+      </div>
+    </div>
+
+    <!-- ── API TESTER ── -->
+    <div id="page-tester" class="page">
+      <div class="page-head">
+        <div>
+          <h1>API Tester</h1>
+          <p>// test endpoints live from the browser</p>
+        </div>
+      </div>
+
+      <div class="tester-grid">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-head"><div class="card-title">Request</div></div>
+
+          <div class="form-group">
+            <label class="form-label">Endpoint</label>
+            <select id="t-endpoint" class="form-input" onchange="onEpChange()">
+              <option value="GET /api/users/me">GET /api/users/me</option>
+              <option value="GET /api/users/all">GET /api/users/all</option>
+              <option value="GET /api/admin/dashboard">GET /api/admin/dashboard</option>
+              <option value="POST /api/auth/logout">POST /api/auth/logout</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Authorization Header</label>
+            <input type="text" id="t-auth" class="form-input" style="font-family:var(--mono);font-size:11px" placeholder="Bearer eyJhbGci..."/>
+          </div>
+
+          <div class="form-group" id="t-body-group">
+            <label class="form-label">Request Body (JSON)</label>
+            <textarea id="t-body" class="form-input" rows="4" style="font-family:var(--mono);font-size:11px;resize:vertical" placeholder='{ "key": "value" }'></textarea>
+          </div>
+
+          <button class="btn btn-primary" onclick="sendRequest()">
+            <span id="t-spin" class="spin"></span>
+            Send Request
+          </button>
+        </div>
+
+        <div class="card" style="margin-bottom:0">
+          <div class="card-head">
+            <div class="card-title">Response</div>
+            <span id="t-status" class="card-sub-label">—</span>
+          </div>
+          <div class="res-viewer" id="t-res">// Response will appear here after sending a request</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ENDPOINTS ── -->
+    <div id="page-endpoints" class="page">
+      <div class="page-head">
+        <div>
+          <h1>API Reference</h1>
+          <p>// all available endpoints in the auth service</p>
+        </div>
+      </div>
+
+      <div class="card mb-20">
+        <div class="card-head">
+          <div class="card-title">Authentication</div>
+          <span class="card-sub-label">/api/auth — public endpoints</span>
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0">
+          <div class="ep-row"><span class="method-tag m-post">POST</span><span class="ep-path">/api/auth/register</span><span class="ep-desc">Register new user account</span></div>
+          <div class="ep-row"><span class="method-tag m-post">POST</span><span class="ep-path">/api/auth/login</span><span class="ep-desc">Login, receive access + refresh tokens</span></div>
+          <div class="ep-row"><span class="method-tag m-post">POST</span><span class="ep-path">/api/auth/refresh</span><span class="ep-desc">Get new access token via refresh token</span></div>
+          <div class="ep-row"><span class="method-tag m-post">POST</span><span class="ep-path">/api/auth/logout</span><span class="ep-desc">Revoke refresh token</span><span class="ep-lock">🔒</span></div>
+        </div>
+      </div>
+
+      <div class="card mb-20">
+        <div class="card-head">
+          <div class="card-title">Users</div>
+          <span class="card-sub-label">/api/users — authenticated</span>
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0">
+          <div class="ep-row"><span class="method-tag m-get">GET</span><span class="ep-path">/api/users/me</span><span class="ep-desc">Get own profile</span><span class="ep-lock">🔒 user</span></div>
+          <div class="ep-row"><span class="method-tag m-get">GET</span><span class="ep-path">/api/users/all</span><span class="ep-desc">List all users</span><span class="ep-lock">🔒 admin</span></div>
+          <div class="ep-row"><span class="method-tag m-delete">DEL</span><span class="ep-path">/api/users/{id}</span><span class="ep-desc">Delete user by ID</span><span class="ep-lock">🔒 admin</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Admin</div>
+          <span class="card-sub-label">/api/admin — ROLE_ADMIN only</span>
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0">
+          <div class="ep-row"><span class="method-tag m-get">GET</span><span class="ep-path">/api/admin/dashboard</span><span class="ep-desc">Admin dashboard info</span><span class="ep-lock">🔒 admin</span></div>
+          <div class="ep-row"><span class="method-tag m-post">POST</span><span class="ep-path">/api/admin/assign-role</span><span class="ep-desc">Assign role to a user</span><span class="ep-lock">🔒 admin</span></div>
+          <div class="ep-row"><span class="method-tag m-post">POST</span><span class="ep-path">/api/admin/revoke-role</span><span class="ep-desc">Remove role from a user</span><span class="ep-lock">🔒 admin</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── USERS ── -->
+    <div id="page-users" class="page">
+      <div class="page-head">
+        <div>
+          <h1>User Management</h1>
+          <p>// all registered users · admin access required</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadUsers()">↻ Refresh</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Roles</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--text3);padding:32px;font-family:var(--mono)">Loading users...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="users-err" class="alert alert-error hidden" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- ── ROLES ── -->
+    <div id="page-roles" class="page">
+      <div class="page-head">
+        <div>
+          <h1>Role Manager</h1>
+          <p>// assign and revoke roles · admin only</p>
+        </div>
+      </div>
+
+      <div class="two-col mb-20">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-head"><div class="card-title">Assign Role</div></div>
+          <div class="form-group">
+            <label class="form-label">User ID</label>
+            <input type="number" id="assign-uid" class="form-input" placeholder="e.g. 2"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role to Assign</label>
+            <select id="assign-role" class="form-input">
+              <option value="ROLE_USER">ROLE_USER</option>
+              <option value="ROLE_MODERATOR">ROLE_MODERATOR</option>
+              <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="assignRole()">Assign Role</button>
+          <div id="assign-res" class="alert hidden" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:0">
+          <div class="card-head"><div class="card-title">Revoke Role</div></div>
+          <div class="form-group">
+            <label class="form-label">User ID</label>
+            <input type="number" id="revoke-uid" class="form-input" placeholder="e.g. 2"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role to Revoke</label>
+            <select id="revoke-role" class="form-input">
+              <option value="ROLE_USER">ROLE_USER</option>
+              <option value="ROLE_MODERATOR">ROLE_MODERATOR</option>
+              <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+            </select>
+          </div>
+          <button class="btn btn-danger w-full" onclick="revokeRole()">Revoke Role</button>
+          <div id="revoke-res" class="alert hidden" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">Role Reference</div></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:flex-start;gap:14px;padding:14px;background:var(--bg1);border-radius:var(--r);border:1px solid var(--border)">
+            <span class="role-chip chip-user" style="margin-top:2px">ROLE_USER</span>
+            <div>
+              <div style="font-size:13px;font-weight:500;margin-bottom:3px">Standard User</div>
+              <div style="font-size:12px;color:var(--text3);font-family:var(--mono)">Default role assigned on registration. Access to /api/users/me and basic endpoints.</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding:14px;background:var(--bg1);border-radius:var(--r);border:1px solid var(--border)">
+            <span class="role-chip chip-mod" style="margin-top:2px">ROLE_MODERATOR</span>
+            <div>
+              <div style="font-size:13px;font-weight:500;margin-bottom:3px">Moderator</div>
+              <div style="font-size:12px;color:var(--text3);font-family:var(--mono)">Elevated user role. Extend with custom moderation endpoints and permissions.</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding:14px;background:var(--bg1);border-radius:var(--r);border:1px solid var(--border)">
+            <span class="role-chip chip-admin" style="margin-top:2px">ROLE_ADMIN</span>
+            <div>
+              <div style="font-size:13px;font-weight:500;margin-bottom:3px">Administrator</div>
+              <div style="font-size:12px;color:var(--text3);font-family:var(--mono)">Full access. Can manage users, assign roles, access all /api/admin/** endpoints.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// CONFIG & STATE
+// ══════════════════════════════════════
+const API_BASE = 'http://localhost:8080';
+let S = { accessToken: null, refreshToken: null, user: null };
+
+// ══════════════════════════════════════
+// AUTH TAB
+// ══════════════════════════════════════
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', (i===0)===(t==='login'))
+  );
+  document.getElementById('login-form').classList.toggle('hidden', t!=='login');
+  document.getElementById('register-form').classList.toggle('hidden', t!=='register');
+  clearAlert();
+}
+
+function showAlert(msg, type='error') {
+  const el = document.getElementById('auth-alert');
+  el.className = `alert alert-${type}`;
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function clearAlert() {
+  document.getElementById('auth-alert').classList.add('hidden');
+}
+
+// ══════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════
+async function doLogin() {
+  const username = document.getElementById('l-username').value.trim();
+  const password = document.getElementById('l-password').value;
+  if (!username || !password) return showAlert('Please enter username and password.');
+
+  spin('login-spin', true);
+  clearAlert();
+
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Login failed');
+    onSuccess(data);
+  } catch(e) {
+    if (e.message.includes('fetch') || e.message.includes('NetworkError')) {
+      demoLogin(username, password);
+    } else {
+      showAlert(e.message);
+    }
+  } finally {
+    spin('login-spin', false);
+  }
+}
+
+function demoLogin(username, password) {
+  const DB = {
+    'admin': { pw:'admin123', roles:['ROLE_ADMIN','ROLE_USER'], id:1, email:'admin@authservice.com' },
+    'user':  { pw:'user123',  roles:['ROLE_USER'],             id:2, email:'user@example.com' },
+  };
+  const found = DB[username];
+  if (!found || found.pw !== password) return showAlert('Invalid credentials. Try: admin/admin123');
+  const tok = makeDemoToken(username);
+  onSuccess({ accessToken: tok, refreshToken: crypto.randomUUID(), id: found.id, username, email: found.email, roles: found.roles });
+}
+
+function makeDemoToken(username) {
+  const h = btoa(JSON.stringify({alg:'HS256',typ:'JWT'}));
+  const p = btoa(JSON.stringify({sub:username, iat:Math.floor(Date.now()/1000), exp:Math.floor(Date.now()/1000)+900}));
+  return `${h}.${p}.demo_signature`;
+}
+
+function onSuccess(data) {
+  S = { accessToken: data.accessToken, refreshToken: data.refreshToken, user: { id: data.id, username: data.username, email: data.email, roles: data.roles } };
+  buildUI();
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').classList.add('visible');
+}
+
+// ══════════════════════════════════════
+// REGISTER
+// ══════════════════════════════════════
+async function doRegister() {
+  const username = document.getElementById('r-username').value.trim();
+  const email    = document.getElementById('r-email').value.trim();
+  const password = document.getElementById('r-password').value;
+  const role     = document.getElementById('r-role').value;
+  if (!username || !email || !password) return showAlert('Please fill in all fields.');
+
+  spin('reg-spin', true);
+  clearAlert();
+
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password, roles:[role] })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Registration failed');
+    showAlert(data.message || 'Account created! You can now sign in.', 'success');
+    setTimeout(() => switchTab('login'), 1800);
+  } catch(e) {
+    if (e.message.includes('fetch')) {
+      showAlert('No backend running — registration requires a live server.', 'error');
+    } else {
+      showAlert(e.message);
+    }
+  } finally {
+    spin('reg-spin', false);
+  }
+}
+
+// ══════════════════════════════════════
+// LOGOUT
+// ══════════════════════════════════════
+async function doLogout() {
+  try {
+    await fetch(`${API_BASE}/api/auth/logout`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${S.accessToken}` }
+    });
+  } catch(_) {}
+  S = { accessToken: null, refreshToken: null, user: null };
+  document.getElementById('app-screen').classList.remove('visible');
+  document.getElementById('auth-screen').style.display = 'flex';
+  clearAlert();
+}
+
+// ══════════════════════════════════════
+// REFRESH TOKEN
+// ══════════════════════════════════════
+async function doRefresh() {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: S.refreshToken })
+    });
+    if (!res.ok) throw new Error('Refresh failed');
+    const data = await res.json();
+    S.accessToken = data.accessToken;
+  } catch(e) {
+    if (e.message.includes('fetch')) {
+      S.accessToken = makeDemoToken(S.user.username);
+    }
+  }
+  updateTokenUI();
+  document.getElementById('t-auth').value = `Bearer ${S.accessToken}`;
+  alert('✓ Access token refreshed!');
+}
+
+// ══════════════════════════════════════
+// BUILD UI AFTER LOGIN
+// ══════════════════════════════════════
+function buildUI() {
+  const u = S.user;
+  const ini = u.username.slice(0,2).toUpperCase();
+  const isAdmin = u.roles.includes('ROLE_ADMIN');
+
+  document.getElementById('s-avatar').textContent = ini;
+  document.getElementById('s-name').textContent   = u.username;
+  document.getElementById('s-role').textContent   = u.roles[0] || '';
+
+  document.getElementById('d-id').textContent       = u.id;
+  document.getElementById('d-username').textContent  = u.username;
+  document.getElementById('d-email').textContent     = u.email;
+  document.getElementById('d-role-count').textContent = u.roles.length;
+  document.getElementById('d-role-names').textContent = u.roles.join(', ');
+
+  document.getElementById('nav-users').classList.toggle('hidden', !isAdmin);
+  document.getElementById('nav-roles').classList.toggle('hidden', !isAdmin);
+  document.getElementById('admin-label').classList.toggle('hidden', !isAdmin);
+
+  document.getElementById('t-auth').value = `Bearer ${S.accessToken}`;
+  document.getElementById('t-body-group').classList.add('hidden');
+
+  updateTokenUI();
+}
+
+function updateTokenUI() {
+  const at = S.accessToken || '—';
+  const rt = S.refreshToken || '—';
+  document.getElementById('t-access').innerHTML =
+    `<button class="token-copy-btn" onclick="copyTok('access')">Copy</button>${at}`;
+  document.getElementById('t-refresh').innerHTML =
+    `<button class="token-copy-btn" onclick="copyTok('refresh')">Copy</button>${rt}`;
+
+  try {
+    const parts = at.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]));
+      const expDate = payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'N/A';
+      let html = '{\n';
+      Object.entries({...payload, exp_readable: expDate}).forEach(([k,v]) => {
+        html += `  <span class="decoded-key">"${k}"</span>: `;
+        html += typeof v === 'string'
+          ? `<span class="decoded-str">"${v}"</span>,\n`
+          : `<span class="decoded-val">${v}</span>,\n`;
+      });
+      html += '}';
+      document.getElementById('t-decoded').innerHTML = html;
+    }
+  } catch(_) {
+    document.getElementById('t-decoded').textContent = '// Could not decode (demo token)';
+  }
+}
+
+// ══════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════
+function goPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const map = { dashboard:0, tokens:1, tester:3, endpoints:4, users:6, roles:7 };
+  const btns = document.querySelectorAll('.nav-btn');
+  if (map[page] !== undefined && btns[map[page]]) btns[map[page]].classList.add('active');
+  if (page === 'users') loadUsers();
+}
+
+// ══════════════════════════════════════
+// USERS TABLE
+// ══════════════════════════════════════
+async function loadUsers() {
+  const tbody = document.getElementById('users-tbody');
+  const errEl = document.getElementById('users-err');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:32px;font-family:var(--mono)">Loading...</td></tr>`;
+  errEl.classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/users/all`, {
+      headers: { 'Authorization': `Bearer ${S.accessToken}` }
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    renderUsers(await res.json());
+  } catch(e) {
+    if (e.message.includes('fetch')) {
+      renderUsers([
+        { id:1, username:'admin',     email:'admin@authservice.com', roles:[{name:'ROLE_ADMIN'},{name:'ROLE_USER'}], enabled:true, createdAt:'2024-01-01T00:00:00' },
+        { id:2, username:'john_doe',  email:'john@example.com',      roles:[{name:'ROLE_USER'}],                    enabled:true, createdAt:'2024-02-10T08:30:00' },
+        { id:3, username:'moderator', email:'mod@example.com',       roles:[{name:'ROLE_MODERATOR'},{name:'ROLE_USER'}], enabled:true, createdAt:'2024-03-05T14:00:00' },
+      ]);
+    } else {
+      errEl.textContent = 'Error loading users: ' + e.message;
+      errEl.classList.remove('hidden');
+      tbody.innerHTML = '';
+    }
+  }
+}
+
+function renderUsers(users) {
+  const tbody = document.getElementById('users-tbody');
+  if (!users.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:32px;font-family:var(--mono)">No users found</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = users.map(u => {
+    const chips = (u.roles||[]).map(r => {
+      const n = r.name||r;
+      const cls = n==='ROLE_ADMIN' ? 'chip-admin' : n==='ROLE_MODERATOR' ? 'chip-mod' : 'chip-user';
+      return `<span class="role-chip ${cls}">${n}</span>`;
+    }).join('');
+    const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—';
+    const isMe = S.user && u.id === S.user.id;
+    return `<tr>
+      <td class="td-mono">${u.id}</td>
+      <td>${u.username}${isMe ? ' <span style="font-family:var(--mono);font-size:10px;color:var(--accent)">(you)</span>' : ''}</td>
+      <td class="td-mono">${u.email}</td>
+      <td>${chips}</td>
+      <td><span style="font-family:var(--mono);font-size:11px;color:${u.enabled?'var(--accent2)':'var(--text3)'}">${u.enabled?'● active':'○ off'}</span></td>
+      <td class="td-mono">${joined}</td>
+      <td>${isMe ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${u.username}')">Delete</button>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/users/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${S.accessToken}` }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    loadUsers();
+  } catch(e) {
+    if (e.message.includes('fetch')) {
+      alert(`(Demo) User "${name}" would be deleted on a live backend.`);
+    } else {
+      alert('Error: ' + e.message);
+    }
+  }
+}
+
+// ══════════════════════════════════════
+// ROLE MANAGER
+// ══════════════════════════════════════
+async function assignRole() {
+  const uid = document.getElementById('assign-uid').value;
+  const role = document.getElementById('assign-role').value;
+  const el = document.getElementById('assign-res');
+  if (!uid) return showRes(el, 'Enter a user ID.', 'error');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/assign-role?userId=${uid}&roleName=${role}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${S.accessToken}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed');
+    showRes(el, data.message, 'success');
+  } catch(e) {
+    if (e.message.includes('fetch')) {
+      showRes(el, `(Demo) ${role} would be assigned to user ${uid}`, 'success');
+    } else {
+      showRes(el, e.message, 'error');
+    }
+  }
+}
+
+async function revokeRole() {
+  const uid = document.getElementById('revoke-uid').value;
+  const role = document.getElementById('revoke-role').value;
+  const el = document.getElementById('revoke-res');
+  if (!uid) return showRes(el, 'Enter a user ID.', 'error');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/revoke-role?userId=${uid}&roleName=${role}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${S.accessToken}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed');
+    showRes(el, data.message, 'success');
+  } catch(e) {
+    if (e.message.includes('fetch')) {
+      showRes(el, `(Demo) ${role} would be revoked from user ${uid}`, 'success');
+    } else {
+      showRes(el, e.message, 'error');
+    }
+  }
+}
+
+function showRes(el, msg, type) {
+  el.className = `alert alert-${type}`;
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+// ══════════════════════════════════════
+// API TESTER
+// ══════════════════════════════════════
+function onEpChange() {
+  const val = document.getElementById('t-endpoint').value;
+  document.getElementById('t-body-group').classList.toggle('hidden', !val.startsWith('POST'));
+}
+
+async function sendRequest() {
+  const raw = document.getElementById('t-endpoint').value;
+  const [method, ...pathParts] = raw.split(' ');
+  const path = pathParts.join(' ');
+  const auth = document.getElementById('t-auth').value;
+  const body = document.getElementById('t-body').value;
+  const resEl = document.getElementById('t-res');
+  const statusEl = document.getElementById('t-status');
+
+  spin('t-spin', true);
+  resEl.textContent = '// Sending...';
+  statusEl.textContent = '...';
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth) headers['Authorization'] = auth;
+
+  try {
+    const opts = { method, headers };
+    if (method !== 'GET' && body.trim()) opts.body = body;
+    const res = await fetch(`${API_BASE}${path}`, opts);
+    const text = await res.text();
+    let parsed; try { parsed = JSON.parse(text); } catch(_) { parsed = text; }
+    const color = res.ok ? 'var(--accent2)' : 'var(--danger)';
+    statusEl.innerHTML = `<span style="color:${color};font-family:var(--mono)">${res.status} ${res.statusText}</span>`;
+    resEl.textContent = typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : parsed;
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:var(--danger);font-family:var(--mono)">Network Error</span>`;
+    resEl.textContent = `// ${e.message}\n\n// Make sure Spring Boot is running:\n// mvn spring-boot:run\n// Then try again at ${API_BASE}${path}`;
+  } finally {
+    spin('t-spin', false);
+  }
+}
+
+// ══════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════
+function copyTok(type) {
+  const tok = type === 'access' ? S.accessToken : S.refreshToken;
+  navigator.clipboard.writeText(tok||'').then(() =>
+    alert(`✓ ${type==='access'?'Access':'Refresh'} token copied to clipboard!`)
+  );
+}
+
+function spin(id, show) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = show ? 'inline-block' : 'none';
+}
+</script>
+</body>
+</html>
