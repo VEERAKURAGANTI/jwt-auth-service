@@ -76,13 +76,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	}
 
 	@Override
-	protected boolean shouldNotFilter(HttpServletRequest request) {
-		String path = request.getServletPath();
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
 
-		// Return true to SKIP this filter for these paths
-		return path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")
-				|| path.startsWith("/api/auth/refresh") || path.startsWith("/swagger-ui")
-				|| path.startsWith("/api-docs") || path.startsWith("/v3/api-docs");
-	}
+        // Skip JWT filter for ALL these paths
+        return path.equals("/")
+                || path.equals("/index.html")
+                || path.endsWith(".html")
+                || path.endsWith(".css")
+                || path.endsWith(".js")
+                || path.endsWith(".ico")
+                || path.startsWith("/static/")
+                || path.startsWith("/assets/")
+                || path.startsWith("/api/auth/login")
+                || path.startsWith("/api/auth/register")
+                || path.startsWith("/api/auth/refresh")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/api-docs")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/webjars");
+    }
 
 }
