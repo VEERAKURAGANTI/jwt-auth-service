@@ -10,95 +10,109 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import com.authservice.security.UserDetailsImpl;
 
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')") // ← applies to ALL methods in this class
 @SecurityRequirement(name = "Bearer Authentication")
-@Tag(name = "Admin", description = "Administrative operations — ROLE_ADMIN required")
+@Tag(name = "Admin", description = "Admin operations — ROLE_ADMIN required")
 public class AdminController {
 	private final UserRepository userRepository;
 	private final RoleRepository roleRepository;
 
-	@GetMapping("/dashboard")
-	@Operation(summary = "Admin dashboard — verify admin access")
-	public ResponseEntity<MessageResponse> dashboard() {
-		return ResponseEntity.ok(new MessageResponse(
-				"Welcome Admin! You have ROLE_ADMIN access. " + "Total users: " + userRepository.count()));
+	private void requireAdmin(UserDetailsImpl currentUser) {
+		boolean isAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+		if (!isAdmin) {
+			throw new org.springframework.security.access.AccessDeniedException("Access denied: ROLE_ADMIN required.");
+		}
 	}
+
+	@GetMapping("/dashboard")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Admin dashboard")
+	public ResponseEntity<MessageResponse> dashboard(@AuthenticationPrincipal UserDetailsImpl currentUser) {
+
+		requireAdmin(currentUser);
+
+		return ResponseEntity.ok(new MessageResponse("Welcome Admin! Total users: " + userRepository.count()));
+	}
+	
 
 	@PostMapping("/assign-role")
-	@Operation(summary = "Assign a role to a user")
-	public ResponseEntity<MessageResponse> assignRole(@RequestParam Long userId, @RequestParam String roleName) {
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Assign role to user")
+    public ResponseEntity<MessageResponse> assignRole(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
+            @RequestParam Long userId,
+            @RequestParam String roleName) {
 
-		// Find the user — throws RuntimeException if not found
-		// GlobalExceptionHandler catches and returns 500
-		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+        requireAdmin(currentUser);
 
-		// Convert the role name string to ERole enum
-		// ERole.valueOf("ROLE_ADMIN") → ERole.ROLE_ADMIN
-		// Throws IllegalArgumentException if invalid role name
-		ERole eRole;
-		try {
-			eRole = ERole.valueOf(roleName.toUpperCase());
-		} catch (IllegalArgumentException e) {
-			throw new RuntimeException(
-					"Invalid role name: " + roleName + ". Valid values: ROLE_USER, ROLE_MODERATOR, ROLE_ADMIN");
-		}
-		 Role role = roleRepository.findByName(eRole)
-	                .orElseThrow(() -> new RuntimeException(
-	                        "Role not found in DB: " + roleName));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException(
+                        "User not found with id: " + userId));
 
-	        // Add role to user's role set
-	        // HashSet.add() is idempotent — no duplicate if already has role
-	        user.getRoles().add(role);
+        ERole eRole;
+        try {
+            eRole = ERole.valueOf(roleName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(
+                    "Invalid role: " + roleName
+                    + ". Use: ROLE_USER, ROLE_MODERATOR, ROLE_ADMIN");
+        }
 
-	        // Save updates the user_roles join table
-	        userRepository.save(user);
+        Role role = roleRepository.findByName(eRole)
+                .orElseThrow(() -> new RuntimeException(
+                        "Role not found: " + roleName));
 
-	        return ResponseEntity.ok(new MessageResponse(
-	                "Role " + roleName + " assigned to user "
-	                        + user.getUsername()));
-	}
+        user.getRoles().add(role);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(new MessageResponse(
+                "Role " + roleName + " assigned to "
+                        + user.getUsername()));
+    }
+
 
 	@PostMapping("/revoke-role")
-	@Operation(summary = "Remove a role from a user")
-	public ResponseEntity<MessageResponse> revokeRole(@RequestParam Long userId, @RequestParam String roleName) {
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Revoke role from user")
+    public ResponseEntity<MessageResponse> revokeRole(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
+            @RequestParam Long userId,
+            @RequestParam String roleName) {
 
-		// Find the user
-		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+        requireAdmin(currentUser);
 
-		// Convert string to ERole enum
-		ERole eRole;
-		try {
-			eRole = ERole.valueOf(roleName.toUpperCase());
-		} catch (IllegalArgumentException e) {
-			throw new RuntimeException(
-					"Invalid role name: " + roleName + ". Valid values: ROLE_USER, ROLE_MODERATOR, ROLE_ADMIN");
-		}
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException(
+                        "User not found with id: " + userId));
 
-		// Find the Role entity from DB
-		Role role = roleRepository.findByName(eRole)
-				.orElseThrow(() -> new RuntimeException("Role not found in DB: " + roleName));
+        ERole eRole;
+        try {
+            eRole = ERole.valueOf(roleName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(
+                    "Invalid role: " + roleName);
+        }
 
-		// Remove role from user's role set
-		// HashSet.remove() is safe even if role not present
-		user.getRoles().remove(role);
+        Role role = roleRepository.findByName(eRole)
+                .orElseThrow(() -> new RuntimeException(
+                        "Role not found: " + roleName));
 
-		// Save updates the user_roles join table
-		userRepository.save(user);
+        user.getRoles().remove(role);
+        userRepository.save(user);
 
-		return ResponseEntity.ok(new MessageResponse("Role " + roleName + " revoked from user " + user.getUsername()));
-	}
+        return ResponseEntity.ok(new MessageResponse(
+                "Role " + roleName + " revoked from "
+                        + user.getUsername()));
+    }
 
 }

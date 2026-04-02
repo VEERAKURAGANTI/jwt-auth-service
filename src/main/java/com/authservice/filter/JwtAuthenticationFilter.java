@@ -9,8 +9,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+
 import com.authservice.security.JwtService;
 import com.authservice.security.UserDetailsServiceImpl;
+import com.authservice.service.TokenBlacklistService;
 import com.authservice.util.JwtUtil;
 
 import jakarta.servlet.FilterChain;
@@ -27,6 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private final JwtService jwtService;
 	private final UserDetailsServiceImpl userDetailsService;
+	private final TokenBlacklistService tokenBlacklistService;
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -38,6 +41,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			return;
 		}
 		final String jwt = authHeader.substring(JwtUtil.TOKEN_PREFIX.length());
+		 if (tokenBlacklistService.isBlacklisted(jwt)) {
+	            log.warn("Blacklisted token used — rejecting request");
+	            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+	            response.setContentType("application/json");
+	            response.getWriter().write(
+	                "{\"message\": \"Token has been revoked. Please log in again.\"}");
+	            return;
+	        }
+		
 		final String username;
 		try {
 			username = jwtService.extractUsername(jwt);

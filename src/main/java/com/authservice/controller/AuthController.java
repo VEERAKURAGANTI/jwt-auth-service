@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -56,17 +57,28 @@ public class AuthController {
 	        // 200 OK — new access token issued
 	        return ResponseEntity.ok(response);
 	    }
-	  @PostMapping("/logout")
+	 
+	    @PostMapping("/logout")
 	    @PreAuthorize("isAuthenticated()")
 	    @SecurityRequirement(name = "Bearer Authentication")
 	    @Operation(summary = "Logout and revoke refresh token")
 	    public ResponseEntity<MessageResponse> logout(
-	            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+	            @AuthenticationPrincipal UserDetailsImpl currentUser,
+	            HttpServletRequest request) {
+
+	        // Extract the raw JWT from the Authorization header
+	        // so we can blacklist it in TokenBlacklistService
+	        String authHeader = request.getHeader("Authorization");
+	        String accessToken = null;
+
+	        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+	            // Remove "Bearer " prefix to get just the token string
+	            accessToken = authHeader.substring(7);
+	        }
 
 	        MessageResponse response = authService.logout(
-	                currentUser.getUsername());
+	                currentUser.getUsername(), accessToken);
 
-	        // 200 OK — logged out successfully
 	        return ResponseEntity.ok(response);
 	    }
 

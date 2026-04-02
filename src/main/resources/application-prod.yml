@@ -1,0 +1,33 @@
+# Production configuration
+# These values will be overridden by environment variables
+
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # NEVER use 'create' or 'update' in production
+      # Use 'validate' once your schema is stable
+      ddl-auto: update
+    show-sql: false        # disable SQL logging in production
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+
+springdoc:
+  swagger-ui:
+    enabled: false         # disable Swagger in production
+  api-docs:
+    enabled: false
