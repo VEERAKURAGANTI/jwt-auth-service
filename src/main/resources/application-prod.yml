@@ -6,7 +6,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://postgres:gYoFrbTUICKeWmNKbesQYRIawcDCxYae@postgres.railway.internal:5432/railway
+    url: jdbc:postgresql://postgres.railway.internal:5432/railway
     username: postgres
     password: gYoFrbTUICKeWmNKbesQYRIawcDCxYae
     driver-class-name: org.postgresql.Driver
