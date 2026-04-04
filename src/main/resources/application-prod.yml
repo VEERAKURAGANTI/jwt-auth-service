@@ -2,13 +2,13 @@
 # These values will be overridden by environment variables
 
 server:
-  port: ${PORT:8080}
+  port: 8080
 
 spring:
   datasource:
-    url: ${DATABASE_URL}
-    username: ${DATABASE_USERNAME}
-    password: ${DATABASE_PASSWORD}
+    url: postgresql://postgres:gYoFrbTUICKeWmNKbesQYRIawcDCxYae@postgres.railway.internal:5432/railway
+    username: postgres
+    password: gYoFrbTUICKeWmNKbesQYRIawcDCxYae
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -22,7 +22,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: 90043579b183876caa0bcfbae97e7a995257a0df1020c06931b7fc130f8c4ccf
   access-token-expiration: 900000
   refresh-token-expiration: 604800000
 
